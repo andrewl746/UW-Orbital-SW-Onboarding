@@ -3,6 +3,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends
 from fastapi.exceptions import HTTPException
+from sqlalchemy.exc import IntegrityError
 
 from app.api.schemas.requests import CreateCommandRequest, UpdateCommandRequest
 from app.api.schemas.responses import CommandResponse, CommandsResponse, DeleteCommandResponse
@@ -80,9 +81,20 @@ async def update_command(
     :raises HTTPException: 422 if the repository rejects the update, e.g. a value of the wrong type or a
         ``type_`` that is not an existing main command. A rejected update leaves the command unchanged.
     """
-    # TODO: (STEP 3) Implement this stub!
+    try:
+        await commands.get_by_id(command_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+
+    dictionary = request.model_dump(exclude_unset=True)
+
+    try:
+        updated_command = await commands.update(command_id, dictionary)
+    except (ValueError, TypeError, RuntimeError, IntegrityError) as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
     # TODO: (STEP 4) Wire CommandHistory table appending into this route!
-    return CommandResponse(data=None)
+    return CommandResponse(data=updated_command)
 
 
 @commands_router.delete("/{command_id}")
